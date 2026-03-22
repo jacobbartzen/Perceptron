@@ -74,7 +74,7 @@ int main() {
         }
     }
 
-    if (printResults) printf("Actual Price: %i\n", label[DATA_SIZE - 1]);
+    if (printResults) printf("Goal Output: %i\n", label[DATA_SIZE - 1]);
 
     //Network Training Loop
     for (int epoch = 1; epoch <= EPOCHS; epoch++) {
@@ -107,7 +107,7 @@ int main() {
         }
 
         //Calculate Average Error for Epoch
-        eAvg /= DATA_SIZE / 100;
+        eAvg = (eAvg / DATA_SIZE) * 100;
 
         //End timing and calculate total runtime for epoch
         clock_t end = clock();
