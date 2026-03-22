@@ -46,16 +46,19 @@ int label[] = {120000, 185000, 140000, 280000, 350000, 230000, 500000, 160000, 4
 
 int main() {
 
-    //Generate Random Weights for each input and bias
+    //Generate Random Weights and Bias
     float weights[INPUT_SIZE];
+    float b = 0, eTotal = 0, result = 0, eAvg = 0, lastEAvg = 1000;
+    srand(time(NULL));
     for (int i = 0; i < INPUT_SIZE; i++) weights[i] = (float)rand() / RAND_MAX;
+    b = (float)rand() / RAND_MAX;
 
     float maxValues[INPUT_SIZE] = {0, 0, 0};
-    float b = 0, eTotal = 0, result = 0, eAvg = 0, lastEAvg = 1000;
-    int i = 0, epoch = 0;
 
+    //START TIMING
     clock_t start = clock();
 
+    //Normalize Data by Dividing Each Input by Max to Scale Between 0 and 1
     if (normalizeData) {
         //Find max of each input
         for (int i = 0; i < DATA_SIZE; i++) {
@@ -73,48 +76,56 @@ int main() {
 
     if (printResults) printf("Actual Price: %i\n", label[DATA_SIZE - 1]);
 
-    for (epoch = 1; epoch <= EPOCHS; epoch++) {
+    //Network Training Loop
+    for (int epoch = 1; epoch <= EPOCHS; epoch++) {
 
+        //Reset Average Error for Epoch
         eAvg = 0;
 
-        for (i = 0; i < DATA_SIZE; i++) {
+        //Loop through each data point in training set
+        for (int i = 0; i < DATA_SIZE; i++) {
 
             //Calculate Predicted Price
             result = 0;
             for (int j = 0; j < INPUT_SIZE; j++) result += inputs[i][j] * weights[j];
             result += b;
 
-            //Calculate Error
+            //Calculate Total Error
             eTotal = label[i] - result;
 
             //Calculate Abs Average Error
-            eAvg += fabs(eTotal / label[i]) * 100;
+            eAvg += fabs(eTotal / label[i]);
 
-            //Change Weights
+            //Update Weights
             for (int j = 0; j < INPUT_SIZE; j++) {
                 weights[j] += LEARNING_RATE * eTotal * inputs[i][j];
             }
 
-            //Change Bias
+            //Update Bias
             b += LEARNING_RATE * eTotal;
 
         }
 
-        eAvg /= DATA_SIZE;
+        //Calculate Average Error for Epoch
+        eAvg /= DATA_SIZE / 100;
 
+        //End timing and calculate total runtime for epoch
         clock_t end = clock();
-
         double runtime = (double)(end - start) / CLOCKS_PER_SEC;
 
-        // Calculate Result for Print Price
-        result = 0;
-        for (int j = 0; j < INPUT_SIZE; j++) result += inputs[DATA_SIZE - 1][j] * weights[j];
-        result += b;
-
+        //Print Results at set intervals
         if (epoch % PRINT_INTERVAL == 0 && printResults) {
+
+            //Calculate Result with updated weights to print
+            result = 0;
+            for (int j = 0; j < INPUT_SIZE; j++) result += inputs[DATA_SIZE - 1][j] * weights[j];
+            result += b;
+            
+            //Print Epoch, Average Error, Runtime, and Equation with Updated Weights
             printf("Epoch: %i | Average Error: %.2f | Runtime: %.1f | Equation: %.0f = (%.2f * %.2f) + (%.2f * %.2f) + (%.2f * %.2f) + %.2f\n", epoch, eAvg, runtime * 1000, result, weights[0], inputs[DATA_SIZE - 1][0], weights[1], inputs[DATA_SIZE - 1][1], weights[2], inputs[DATA_SIZE - 1][2], b);
         }
 
+        //Stop early if error improvement is less than 0.001
         if (earlyStopping && lastEAvg - eAvg < 0.001 && epoch > MIN_STOPPING_EPOCH) {
             printf("Stopping Early - Error Improvement: %.4f\n", lastEAvg - eAvg);
             break;
