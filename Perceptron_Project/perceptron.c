@@ -11,7 +11,7 @@
 #define TESTING_SIZE 5       //How much of data to use for testing
 #define EPOCHS 10000         //Amount of Times to Go Through Entire Dataset
 #define LEARNING_RATE 0.25   //How Fast Weights change based on Error
-#define PRINT_INTERVAL 5     //How Often to Print Results (in Epochs)
+#define PRINT_INTERVAL 50     //How Often to Print Results (in Epochs)
 #define MIN_STOPPING_EPOCH 50 //Minimum Epochs before Early Stopping can Occur
 bool printResults = true;    //Whether to Print Results at start of each Epoch
 bool normalizeData = true;   //Whether to scale data between 0 and 1
@@ -48,11 +48,11 @@ int main() {
 
     //Generate Random Weights and Bias
     float weights[INPUT_SIZE];
-    float b = 0, eTotal = 0, result = 0, eAvg = 0, lastEAvg = 1000;
     srand(time(NULL));
     for (int i = 0; i < INPUT_SIZE; i++) weights[i] = (float)rand() / RAND_MAX;
-    b = (float)rand() / RAND_MAX;
+    float b = (float)rand() / RAND_MAX;
 
+    float eTotal = 0, result = 0, eAvg = 0, lastEAvg = 1000;
     float maxValues[INPUT_SIZE] = {0, 0, 0};
 
     //START TIMING
@@ -90,6 +90,9 @@ int main() {
             for (int j = 0; j < INPUT_SIZE; j++) result += inputs[i][j] * weights[j];
             result += b;
 
+            //Activation Function: ReLU (Rectified Linear Unit)
+            if (result < 0) result = 0;
+
             //Calculate Total Error
             eTotal = label[i] - result;
 
@@ -122,7 +125,11 @@ int main() {
             result += b;
             
             //Print Epoch, Average Error, Runtime, and Equation with Updated Weights
-            printf("Epoch: %i | Average Error: %.2f | Runtime: %.1f | Equation: %.0f = (%.2f * %.2f) + (%.2f * %.2f) + (%.2f * %.2f) + %.2f\n", epoch, eAvg, runtime * 1000, result, weights[0], inputs[DATA_SIZE - 1][0], weights[1], inputs[DATA_SIZE - 1][1], weights[2], inputs[DATA_SIZE - 1][2], b);
+            printf("Epoch: %i | Average Error: %.2f | Runtime: %.1f | Equation: %.0f = ", epoch, eAvg, runtime * 1000, result);
+            for (int z = 0; z < INPUT_SIZE; z++) {
+                printf("(%.2f * %.2f) + ", weights[z], inputs[DATA_SIZE - 1][z]);
+            }
+            printf("%.2f\n", b);
         }
 
         //Stop early if error improvement is less than 0.001
