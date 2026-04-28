@@ -1,12 +1,12 @@
 ## Perceptron.c
 
-The main file is perceptron.c. perceptronRunners.c uses the same implementation with runner data as a test dataset. The project currently implements a single neuron. The user can adjust:
+The main file is perceptron.c. The project currently implements a single neuron. The user can adjust:
 - All input data
 - Number of epochs
 - Print settings
 - Learning Rate
 
-The code is commented and gives a basic overview of how a perceptron learns using weights and adjustments for data. 
+The code is commented and gives a basic overview of how a neuron learns using weights and adjustments for data. 
 
 ## How a neuron works
 
