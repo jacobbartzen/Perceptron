@@ -10,15 +10,15 @@
 #define TRAINING_SIZE 15      // How much of data to use for training
 int TESTING_SIZE = DATA_SIZE - TRAINING_SIZE;
 #define EPOCHS 500000         // Amount of Times to Go Through Entire Dataset
-#define LEARNING_RATE 0.000000002    // How Fast Weights change based on Error
+#define LEARNING_RATE 0.00000002    // How Fast Weights change based on Error
 #define PRINT_INTERVAL 50000     // How Often to Print Results (in Epochs)
 #define MIN_STOPPING_EPOCH 50 // Minimum Epochs before Early Stopping can Occur
-#define LAYER_1_SIZE 5        // Number of Neurons in First Layer (Hidden Layer)
+#define LAYER_1_SIZE 15        // Number of Neurons in First Layer (Hidden Layer)
 bool normalizeData = true;    // Whether to scale data between 0 and 1
 bool earlyStopping = false;    // Whether to Stop Training if Error stops decreasing
 
 //INPUTS: Sq footage, bedrooms, yard size
-float inputs[DATA_SIZE][INPUT_SIZE] = {
+float x[DATA_SIZE][INPUT_SIZE] = {
     {850, 1, 500},
     {1200, 2, 1000},
     {950, 2, 750},
@@ -41,8 +41,11 @@ float inputs[DATA_SIZE][INPUT_SIZE] = {
     {1900, 3, 1800}};
 
 // Ex. Result Price ($)
-int label[] = {120000, 185000, 140000, 280000, 350000, 230000, 500000, 160000, 420000, 95000,
-               270000, 470000, 200000, 330000, 75000, 255000, 390000, 155000, 540000, 300000};
+//Linear Labels
+int y[] = {120000, 185000, 140000, 280000, 350000, 230000, 500000, 160000, 420000, 95000, 270000, 470000, 200000, 330000, 75000, 255000, 390000, 155000, 540000, 300000};
+
+//Non-Linear Labels
+//int y[] = {95000, 210000, 125000, 480000, 890000, 370000, 2100000, 175000, 1400000, 72000, 460000, 1850000, 240000, 750000, 52000, 420000, 1150000, 162000, 2800000, 580000};
 
 int main() {
 
@@ -54,14 +57,14 @@ int main() {
         // Find max of each input
         for (int i = 0; i < DATA_SIZE; i++) {
             for (int j = 0; j < INPUT_SIZE; j++) {
-                if (inputs[i][j] > maxValues[j]) maxValues[j] = inputs[i][j];
+                if (x[i][j] > maxValues[j]) maxValues[j] = x[i][j];
             }
         }
 
         // Divide all datasets by max
         for (int i = 0; i < DATA_SIZE; i++) {
             for (int j = 0; j < INPUT_SIZE; j++) {
-                inputs[i][j] /= maxValues[j];
+                x[i][j] /= maxValues[j];
             }
         }
     }
@@ -112,7 +115,7 @@ int main() {
 
                 //Calculate Predicted Price
                 Z1[j] = 0;
-                for (int k = 0; k < INPUT_SIZE; k++) Z1[j] += inputs[i][k] * W1[j][k];
+                for (int k = 0; k < INPUT_SIZE; k++) Z1[j] += x[i][k] * W1[j][k];
                 Z1[j] += B1[j];
 
                 //Activation Function: ReLU (Rectified Linear Unit)
@@ -125,10 +128,10 @@ int main() {
             for (int j = 0; j < LAYER_1_SIZE; j++) Z2 += A1[j] * W2[j];
 
             //Calculate Total Error
-            eTotal = label[i] - Z2;
+            eTotal = y[i] - Z2;
 
             //Calculate Abs Average Error
-            eTrainingAvg += fabs(eTotal / label[i]);
+            eTrainingAvg += fabs(eTotal / y[i]);
 
             //Update Layer 1 Weights and Bias
             for (int j = 0; j < LAYER_1_SIZE; j++) {
@@ -138,7 +141,7 @@ int main() {
                 B1[j] += LEARNING_RATE * hiddenError;
 
                 for (int k = 0; k < INPUT_SIZE; k++) {
-                    W1[j][k] += LEARNING_RATE * hiddenError * inputs[i][k];
+                    W1[j][k] += LEARNING_RATE * hiddenError * x[i][k];
                 }
             }
 
@@ -182,7 +185,7 @@ int main() {
             // Calculate Predicted Price
             Z1[j] = 0;
             for (int k = 0; k < INPUT_SIZE; k++)
-                Z1[j] += inputs[i][k] * W1[j][k];
+                Z1[j] += x[i][k] * W1[j][k];
             Z1[j] += B1[j];
 
             // Activation Function: ReLU (Rectified Linear Unit)
@@ -195,7 +198,7 @@ int main() {
         for (int j = 0; j < LAYER_1_SIZE; j++) Z2 += A1[j] * W2[j];
 
         // Calculate Abs Average Error
-        eTestingAvg += fabs((label[i] - Z2) / label[i]);
+        eTestingAvg += fabs((y[i] - Z2) / y[i]);
     }
 
     // Calculate Average Error for Epoch
