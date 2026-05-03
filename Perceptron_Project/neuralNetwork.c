@@ -8,18 +8,16 @@
 #define DATA_SIZE 20          // Amount of Data Points
 #define INPUT_SIZE 3          // Number of Different Inputs
 #define TRAINING_SIZE 15      // How much of data to use for training
-#define TESTING_SIZE 5        // How much of data to use for testing
-#define EPOCHS 10000          // Amount of Times to Go Through Entire Dataset
-#define LEARNING_RATE 0.25    // How Fast Weights change based on Error
-#define PRINT_INTERVAL 50     // How Often to Print Results (in Epochs)
+int TESTING_SIZE = DATA_SIZE - TRAINING_SIZE;
+#define EPOCHS 500000         // Amount of Times to Go Through Entire Dataset
+#define LEARNING_RATE 0.000000002    // How Fast Weights change based on Error
+#define PRINT_INTERVAL 50000     // How Often to Print Results (in Epochs)
 #define MIN_STOPPING_EPOCH 50 // Minimum Epochs before Early Stopping can Occur
 #define LAYER_1_SIZE 5        // Number of Neurons in First Layer (Hidden Layer)
-#define LAYER_2_SIZE 1        // Number of Neurons in Second Layer (Output Layer)
-bool printResults = true;     // Whether to Print Results at start of each Epoch
 bool normalizeData = true;    // Whether to scale data between 0 and 1
-bool earlyStopping = true;    // Whether to Stop Training if Error stops decreasing
+bool earlyStopping = false;    // Whether to Stop Training if Error stops decreasing
 
-// INPUTS: Sq footage, bedrooms, yard size
+//INPUTS: Sq footage, bedrooms, yard size
 float inputs[DATA_SIZE][INPUT_SIZE] = {
     {850, 1, 500},
     {1200, 2, 1000},
@@ -48,112 +46,162 @@ int label[] = {120000, 185000, 140000, 280000, 350000, 230000, 500000, 160000, 4
 
 int main() {
 
-    // Generate Random Weights and Bias
-    float W1[LAYER_1_SIZE][INPUT_SIZE];
-    float W2[LAYER_2_SIZE][LAYER_1_SIZE];
-    float B1[LAYER_1_SIZE];
-    float B2[LAYER_2_SIZE];
-    srand(time(NULL));
-    for (int i = 0; i < LAYER_1_SIZE; i++) {
-        B1[i] = (float)rand() / RAND_MAX;
-        for (int j = 0; j < INPUT_SIZE; j++) {
-            W1[i][j] = (float)rand() / RAND_MAX;
-        }
-    }
-    for (int i = 0; i < LAYER_2_SIZE; i++) {
-        B2[i] = (float)rand() / RAND_MAX;
-        for (int j = 0; j < LAYER_1_SIZE; j++) {
-            W2[i][j] = (float)rand() / RAND_MAX;
-        }
-    }
-
-    float eTotal = 0, result = 0, eAvg = 0, lastEAvg = 1000;
-    float maxValues[INPUT_SIZE] = {0, 0, 0};
-
-    // START TIMING
-    clock_t start = clock();
-
     // Normalize Data by Dividing Each Input by Max to Scale Between 0 and 1
     if (normalizeData) {
+
+        float maxValues[INPUT_SIZE] = {0, 0, 0};
+
         // Find max of each input
         for (int i = 0; i < DATA_SIZE; i++) {
             for (int j = 0; j < INPUT_SIZE; j++) {
-                if (inputs[i][j] > maxValues[j])
-                    maxValues[j] = inputs[i][j];
+                if (inputs[i][j] > maxValues[j]) maxValues[j] = inputs[i][j];
             }
         }
+
         // Divide all datasets by max
         for (int i = 0; i < DATA_SIZE; i++) {
-            for (int j = 0; j < INPUT_SIZE; j++){
+            for (int j = 0; j < INPUT_SIZE; j++) {
                 inputs[i][j] /= maxValues[j];
             }
         }
     }
 
-    if (printResults) printf("Goal Output: %i\n", label[DATA_SIZE - 1]);
+    //Seed Random Number Generator
+    srand(time(NULL));
 
-    // Network Training Loop
+    //Weights
+    float W1[LAYER_1_SIZE][INPUT_SIZE];
+    float W2[LAYER_1_SIZE];
+
+    //Bias
+    float B1[LAYER_1_SIZE];
+    float B2 = (float) rand() / RAND_MAX;
+
+    //Preactiviation Value
+    float Z1[LAYER_1_SIZE];
+    float Z2;
+
+    //Activation Value
+    float A1[LAYER_1_SIZE];
+
+    float eTotal = 0, eTrainingAvg = 0, lastEAvg = 1000, eTestingAvg = 0, hiddenError = 0;
+
+    //Initialize Weights and Bias with small random values between -0.005 and 0.005
+    for (int i = 0; i < LAYER_1_SIZE; i++) {
+        B1[i] = ((float)rand() / RAND_MAX) * 0.01 - 0.005;
+        W2[i] = ((float)rand() / RAND_MAX) * 0.01 - 0.005;
+        for (int j = 0; j < INPUT_SIZE; j++) {
+            W1[i][j] = ((float)rand() / RAND_MAX) * 0.01 - 0.005;
+        }
+    }
+
+    // START TIMING
+    clock_t start = clock();
+
+    //Network Training Loop
     for (int epoch = 1; epoch <= EPOCHS; epoch++) {
 
-        // Reset Average Error for Epoch
-        eAvg = 0;
+        //Reset Average Error for Epoch
+        eTrainingAvg = 0;
 
-        // Loop through each data point in training set
-        for (int i = 0; i < DATA_SIZE; i++) {
+        //Loop through each data point in training set
+        for (int i = 0; i < TRAINING_SIZE; i++) {
 
-            // Calculate Predicted Price
-            result = 0;
-            for (int j = 0; j < INPUT_SIZE; j++) result += inputs[i][j] * W1[0][j];
-            result += B1[0];
+            //Calculate Result for each neuron in first layer
+            for (int j = 0; j < LAYER_1_SIZE; j++) {
 
-            // Activation Function: ReLU (Rectified Linear Unit)
-            if (result < 0) result = 0;
+                //Calculate Predicted Price
+                Z1[j] = 0;
+                for (int k = 0; k < INPUT_SIZE; k++) Z1[j] += inputs[i][k] * W1[j][k];
+                Z1[j] += B1[j];
 
-            //Calculate Total Error
-            eTotal = label[i] - result;
-
-            // Calculate Abs Average Error
-            eAvg += fabs(eTotal / label[i]);
-
-            // Update Weights
-            for (int j = 0; j < INPUT_SIZE; j++) {
-                W1[0][j] += LEARNING_RATE * eTotal * inputs[i][j];
+                //Activation Function: ReLU (Rectified Linear Unit)
+                A1[j] = Z1[j];
+                if (A1[j] < 0) A1[j] = 0;
             }
 
-            // Update Bias
-            B1[0] += LEARNING_RATE * eTotal;
+            //Calculate Result for Output Neuron
+            Z2 = B2;
+            for (int j = 0; j < LAYER_1_SIZE; j++) Z2 += A1[j] * W2[j];
+
+            //Calculate Total Error
+            eTotal = label[i] - Z2;
+
+            //Calculate Abs Average Error
+            eTrainingAvg += fabs(eTotal / label[i]);
+
+            //Update Layer 1 Weights and Bias
+            for (int j = 0; j < LAYER_1_SIZE; j++) {
+
+                hiddenError = eTotal * W2[j] * (A1[j] > 0 ? 1.0f : 0.0f);
+
+                B1[j] += LEARNING_RATE * hiddenError;
+
+                for (int k = 0; k < INPUT_SIZE; k++) {
+                    W1[j][k] += LEARNING_RATE * hiddenError * inputs[i][k];
+                }
+            }
+
+            //Update Layer 2 Weights
+            for (int j = 0; j < LAYER_1_SIZE; j++) {
+                W2[j] += LEARNING_RATE * eTotal * A1[j];
+            }
+            //Update Layer 2 Bias
+            B2 += LEARNING_RATE * eTotal;
         }
 
-        // Calculate Average Error for Epoch
-        eAvg = (eAvg / DATA_SIZE) * 100;
+        //Calculate Average Error for Epoch
+        eTrainingAvg = (eTrainingAvg / TRAINING_SIZE) * 100;
 
-        // End timing and calculate total runtime for epoch
+        //End timing and calculate total runtime for epoch
         clock_t end = clock();
         double runtime = (double)(end - start) / CLOCKS_PER_SEC;
 
-        // Print Results at set intervals
-        if (epoch % PRINT_INTERVAL == 0 && printResults) {
+        //Print Results at set intervals
+        if (epoch % PRINT_INTERVAL == 0) {
 
-            // Calculate Result with updated weights to print
-            result = 0;
-            for (int j = 0; j < INPUT_SIZE; j++) result += inputs[DATA_SIZE - 1][j] * W1[0][j];
-            result += B1[0];
-
-            // Print Epoch, Average Error, Runtime, and Equation with Updated Weights
-            printf("Epoch: %i | Average Error: %.2f | Runtime: %.1f | Equation: %.0f = ", epoch, eAvg, runtime * 1000, result);
-            for (int z = 0; z < INPUT_SIZE; z++) {
-                printf("(%.2f * %.2f) + ", W1[0][z], inputs[DATA_SIZE - 1][z]);
-            }
-            printf("%.2f\n", B1[0]);
+            //Print Epoch, Average Error, and Runtime
+            printf("Epoch: %i | Average Error: %.2f | Runtime: %.1f | Result: %.1f\n", epoch, eTrainingAvg, runtime * 1000, Z2);
         }
 
-        // Stop early if error improvement is less than 0.001
-        if (earlyStopping && lastEAvg - eAvg < 0.001 && epoch > MIN_STOPPING_EPOCH) {
-            printf("Stopping Early - Error Improvement: %.4f\n", lastEAvg - eAvg);
+        //Stop early if error improvement is less than 0.001
+        if (earlyStopping && lastEAvg - eTrainingAvg < 0.001 && epoch > MIN_STOPPING_EPOCH) {
+            printf("Stopping Early - Error Improvement: %.4f\n", lastEAvg - eTrainingAvg);
             break;
         }
 
-        lastEAvg = eAvg;
+        lastEAvg = eTrainingAvg;
     }
+
+    //Loop through testing data
+    for (int i = TRAINING_SIZE; i < DATA_SIZE; i++) {
+
+        //Calculate Result for each neuron in first layer
+        for (int j = 0; j < LAYER_1_SIZE; j++) {
+
+            // Calculate Predicted Price
+            Z1[j] = 0;
+            for (int k = 0; k < INPUT_SIZE; k++)
+                Z1[j] += inputs[i][k] * W1[j][k];
+            Z1[j] += B1[j];
+
+            // Activation Function: ReLU (Rectified Linear Unit)
+            A1[j] = Z1[j];
+            if (A1[j] < 0) A1[j] = 0;
+        }
+
+        // Calculate Result for Output Neuron
+        Z2 = B2;
+        for (int j = 0; j < LAYER_1_SIZE; j++) Z2 += A1[j] * W2[j];
+
+        // Calculate Abs Average Error
+        eTestingAvg += fabs((label[i] - Z2) / label[i]);
+    }
+
+    // Calculate Average Error for Epoch
+    eTestingAvg = (eTestingAvg / TESTING_SIZE) * 100;
+
+    printf("Training Final Error: %.2f | Testing Average Error: %.2f", eTrainingAvg, eTestingAvg);
+
     return 0;
 }
