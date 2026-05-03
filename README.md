@@ -8,12 +8,13 @@ This file has one perceptron. It is able to fit one linear line to the data prov
 
 ## How a neuron works
 
-In a neural network, a neuron basically a function that weights data. The basic steps are:
+In a neural network, a neuron takes in inputs and runs them through a function to produce a single output. The basic steps are:
 
 1. Weight all inputs and add a bias
    - y = w1x1 + w2x2... + wnxn + b = ∑wx + b
 
-2. This value is then passed through an activation function. perceptron.c uses the reLU activation function, which simply changes negative values to 0
+2. Pass the output through an activation function. This model uses the ReLU activation function.
+   - if (y < 0) y = 0
 
 ## Training
 
