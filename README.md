@@ -1,21 +1,20 @@
-## Perceptron.c
+## Machine Learning from Scratch
 
-The main file is perceptron.c. The project currently implements a single neuron. The user can adjust:
-- All input data
-- Number of epochs
-- Print settings
-- Learning Rate
+This project features two main code files, both coded in C: perceptron.c and neuralNetwork.c. neuralNetwork builds on perceptron.c by adding multiple layers, while perceptron.c is a single neuron.
 
-The code is commented and gives a basic overview of how a neuron learns using weights and adjustments for data. 
+## perceptron.c
+
+This file has one perceptron. It is able to fit one linear line to the data provided. The user is able to adjust settings such as the learning rate, epochs, all data, and features such as early stopping and data normalization. The code tracks runtime, error, and prints all weights
 
 ## How a neuron works
 
-In a neural network, a neuron basically a function that weights data. The basic steps are:
+In a neural network, a neuron takes in inputs and runs them through a function to produce a single output. The basic steps are:
 
 1. Weight all inputs and add a bias
    - y = w1x1 + w2x2... + wnxn + b = ∑wx + b
 
-2. This value is then passed through an activation function. perceptron.c uses the reLU activation function, which simply changes negative values to 0
+2. Pass the output through an activation function. This model uses the ReLU activation function.
+   - if (y < 0) y = 0
 
 ## Training
 
@@ -25,6 +24,10 @@ In my example, weights are increased if the output was too high, and decreased i
 
   weights[j] += LEARNING_RATE * eTotal * inputs[i][j];
 
+## Neuron vs. Perceptron
+
+While the file is called perceptron.c, there is one main difference between a perceptron and the neuron coded: A perceptron either outputs 1 or 0 (or sometimes 1 / -1). A perceptron was one of the very early approaches to machine learning. It aimed to mimic a human brain, where neurons either fire or don't fire - binary states. In my file perceptron.c, the neuron outputs a range of values.
+
 ## neuralNetwork.c
 
-This will start to build a more complete neural network with many neurons and layers.
+neuralNetwork.c builds on perceptron.c by adding multiple layers of neurons - currently the user is able to adjust the amount of neurons in layer 2, as well as all features included in perceptron.c.
