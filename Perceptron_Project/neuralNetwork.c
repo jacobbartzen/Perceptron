@@ -9,13 +9,15 @@
 #define INPUT_SIZE 3          // Number of Different Inputs
 #define TRAINING_SIZE 15      // How much of data to use for training
 int TESTING_SIZE = DATA_SIZE - TRAINING_SIZE;
-#define EPOCHS 500000         // Amount of Times to Go Through Entire Dataset
-#define LEARNING_RATE 0.00000002    // How Fast Weights change based on Error
-#define PRINT_INTERVAL 50000     // How Often to Print Results (in Epochs)
+#define EPOCHS 50000         // Amount of Times to Go Through Entire Dataset
+#define LEARNING_RATE 0.05    // How Fast Weights change based on Error
+#define PRINT_INTERVAL 10000     // How Often to Print Results (in Epochs)
 #define MIN_STOPPING_EPOCH 50 // Minimum Epochs before Early Stopping can Occur
-#define LAYER_1_SIZE 15        // Number of Neurons in First Layer (Hidden Layer)
-bool normalizeData = true;    // Whether to scale data between 0 and 1
-bool earlyStopping = false;    // Whether to Stop Training if Error stops decreasing
+bool normalizeData = true;        //Whether to scale data between 0 and 1
+bool earlyStopping = false;       //Whether to Stop Training if Error stops decreasing
+int neuronLayers[] = {50, 25, 15, 5, 1};  //Array of Neuron Counts for Each Layer
+#define layers 5                  //Number of Layers in Network (including output layer)
+#define maxNeurons 50             //Max Number of Neurons in a Layer (for array sizing)
 
 //INPUTS: Sq footage, bedrooms, yard size
 float x[DATA_SIZE][INPUT_SIZE] = {
@@ -42,30 +44,40 @@ float x[DATA_SIZE][INPUT_SIZE] = {
 
 // Ex. Result Price ($)
 //Linear Labels
-int y[] = {120000, 185000, 140000, 280000, 350000, 230000, 500000, 160000, 420000, 95000, 270000, 470000, 200000, 330000, 75000, 255000, 390000, 155000, 540000, 300000};
+float y[] = {120000, 185000, 140000, 280000, 350000, 230000, 500000, 160000, 420000, 95000, 270000, 470000, 200000, 330000, 75000, 255000, 390000, 155000, 540000, 300000};
 
 //Non-Linear Labels
-//int y[] = {95000, 210000, 125000, 480000, 890000, 370000, 2100000, 175000, 1400000, 72000, 460000, 1850000, 240000, 750000, 52000, 420000, 1150000, 162000, 2800000, 580000};
+//float y[] = {95000, 210000, 125000, 480000, 890000, 370000, 2100000, 175000, 1400000, 72000, 460000, 1850000, 240000, 750000, 52000, 420000, 1150000, 162000, 2800000, 580000};
 
 int main() {
 
     // Normalize Data by Dividing Each Input by Max to Scale Between 0 and 1
     if (normalizeData) {
 
-        float maxValues[INPUT_SIZE] = {0, 0, 0};
+        float maxValues[INPUT_SIZE + 1] = {0, 0, 0, 0};
 
-        // Find max of each input
+        // Find all maxes
         for (int i = 0; i < DATA_SIZE; i++) {
+
+            //Find max of inputs
             for (int j = 0; j < INPUT_SIZE; j++) {
                 if (x[i][j] > maxValues[j]) maxValues[j] = x[i][j];
             }
+
+            //Find max of outputs
+            if (y[i] > maxValues[INPUT_SIZE]) maxValues[INPUT_SIZE] = y[i];
         }
 
-        // Divide all datasets by max
+        //Divide data by max
         for (int i = 0; i < DATA_SIZE; i++) {
+
+            //Divide inputs by max
             for (int j = 0; j < INPUT_SIZE; j++) {
                 x[i][j] /= maxValues[j];
             }
+
+            //Divide output by max
+            y[i] /= maxValues[INPUT_SIZE];
         }
     }
 
@@ -73,32 +85,35 @@ int main() {
     srand(time(NULL));
 
     //Weights
-    float W1[LAYER_1_SIZE][INPUT_SIZE];
-    float W2[LAYER_1_SIZE];
+    float W[layers][maxNeurons][maxNeurons];
 
     //Bias
-    float B1[LAYER_1_SIZE];
-    float B2 = (float) rand() / RAND_MAX;
+    float B[layers][maxNeurons];
 
     //Preactiviation Value
-    float Z1[LAYER_1_SIZE];
-    float Z2;
+    float Z[layers][maxNeurons];
 
     //Activation Value
-    float A1[LAYER_1_SIZE];
+    float A[layers][maxNeurons];
 
-    float eTotal = 0, eTrainingAvg = 0, lastEAvg = 1000, eTestingAvg = 0, hiddenError = 0;
+    //Delta for Backpropagation
+    float D[layers][maxNeurons];
+
+    float eTotal = 0, eTrainingAvg = 0, lastEAvg = 1000, eTestingAvg = 0, hiddenError = 0, scale = 0;
 
     //Initialize Weights and Bias with small random values between -0.005 and 0.005
-    for (int i = 0; i < LAYER_1_SIZE; i++) {
-        B1[i] = ((float)rand() / RAND_MAX) * 0.01 - 0.005;
-        W2[i] = ((float)rand() / RAND_MAX) * 0.01 - 0.005;
-        for (int j = 0; j < INPUT_SIZE; j++) {
-            W1[i][j] = ((float)rand() / RAND_MAX) * 0.01 - 0.005;
+    for (int i = 0; i < layers; i++) {
+        int prevSize = (i == 0) ? INPUT_SIZE : neuronLayers[i - 1];
+        scale = sqrt(2.0f / prevSize);
+        for (int j = 0; j < neuronLayers[i]; j++) {
+            B[i][j] = 0; // bias initialized to 0 is standard with He init
+            for (int k = 0; k < prevSize; k++) {
+                W[i][j][k] = (((float)rand() / RAND_MAX) * 2 - 1) * scale;
+            }
         }
     }
 
-    // START TIMING
+    //START TIMING
     clock_t start = clock();
 
     //Network Training Loop
@@ -110,47 +125,80 @@ int main() {
         //Loop through each data point in training set
         for (int i = 0; i < TRAINING_SIZE; i++) {
 
-            //Calculate Result for each neuron in first layer
-            for (int j = 0; j < LAYER_1_SIZE; j++) {
+            //Forward Pass
+            //For each layer
+            for (int j = 0; j < layers; j++) {
 
-                //Calculate Predicted Price
-                Z1[j] = 0;
-                for (int k = 0; k < INPUT_SIZE; k++) Z1[j] += x[i][k] * W1[j][k];
-                Z1[j] += B1[j];
+                //For each neuron
+                for (int k = 0; k < neuronLayers[j]; k++) {
 
-                //Activation Function: ReLU (Rectified Linear Unit)
-                A1[j] = Z1[j];
-                if (A1[j] < 0) A1[j] = 0;
+                    Z[j][k] = B[j][k];
+
+                    //If first layer, use inputs
+                    if (j == 0) for (int z = 0; z < INPUT_SIZE; z++) Z[j][k] += x[i][z] * W[j][k][z];
+
+                    //Else, use outputs from previous layer
+                    else for (int z = 0; z < neuronLayers[j - 1]; z++) Z[j][k] += A[j - 1][z] * W[j][k][z];
+
+                    //Activation Function: Leaky ReLU (Rectified Linear Unit)
+                    A[j][k] = (Z[j][k] > 0) ? Z[j][k] : 0.01f * Z[j][k];
+                }
             }
 
-            //Calculate Result for Output Neuron
-            Z2 = B2;
-            for (int j = 0; j < LAYER_1_SIZE; j++) Z2 += A1[j] * W2[j];
-
             //Calculate Total Error
-            eTotal = y[i] - Z2;
+            eTotal = y[i] - Z[layers - 1][0];
 
             //Calculate Abs Average Error
             eTrainingAvg += fabs(eTotal / y[i]);
 
-            //Update Layer 1 Weights and Bias
-            for (int j = 0; j < LAYER_1_SIZE; j++) {
+            //Backward Pass (Backpropagation)
+            //For output layer, delta is total error
+            D[layers - 1][0] = eTotal;
 
-                hiddenError = eTotal * W2[j] * (A1[j] > 0 ? 1.0f : 0.0f);
+            //For each layer
+            for (int j = layers - 2; j >= 0; j--) {
 
-                B1[j] += LEARNING_RATE * hiddenError;
+                //For each neuron
+                for (int k = 0; k < neuronLayers[j]; k++) {
 
-                for (int k = 0; k < INPUT_SIZE; k++) {
-                    W1[j][k] += LEARNING_RATE * hiddenError * x[i][k];
+                    //Set Delta to 0
+                    D[j][k] = 0.0f;
+
+                    //Sum of Deltas from layer ahead * corresponding weights
+                    for (int z = 0; z < neuronLayers[j + 1]; z++) {
+                        D[j][k] += D[j + 1][z] * W[j + 1][z][k];
+                    }
+
+                    //Leaky ReLU Derivative
+                    D[j][k] *= (Z[j][k] > 0) ? 1.0f : 0.01f;
                 }
             }
 
-            //Update Layer 2 Weights
-            for (int j = 0; j < LAYER_1_SIZE; j++) {
-                W2[j] += LEARNING_RATE * eTotal * A1[j];
+            //Update Weights and Biases using Deltas
+            //For each layer
+            for (int j = 0; j < layers; j++) {
+
+                //For each neuron
+                for (int k = 0; k < neuronLayers[j]; k++) {
+
+                    //Update Bias
+                    B[j][k] += LEARNING_RATE * D[j][k];
+
+                    //If first layer use inputs
+                    if (j == 0) {
+                        for (int z = 0; z < INPUT_SIZE; z++) {
+                            W[j][k][z] += LEARNING_RATE * D[j][k] * x[i][z];
+                        }
+                    }
+
+                    //Else use other neurons
+                    else {
+                        for (int z = 0; z < neuronLayers[j - 1]; z++) {
+                            W[j][k][z] += LEARNING_RATE * D[j][k] * A[j - 1][z];
+                        }
+                    }
+                }
             }
-            //Update Layer 2 Bias
-            B2 += LEARNING_RATE * eTotal;
         }
 
         //Calculate Average Error for Epoch
@@ -164,7 +212,13 @@ int main() {
         if (epoch % PRINT_INTERVAL == 0) {
 
             //Print Epoch, Average Error, and Runtime
-            printf("Epoch: %i | Average Error: %.2f | Runtime: %.1f | Result: %.1f\n", epoch, eTrainingAvg, runtime * 1000, Z2);
+            printf("Epoch: %i | Average Error: %.2f | Runtime: %.1f | Result: %.3f\n", epoch, eTrainingAvg, runtime * 1000, Z[layers - 1][0]);
+
+            //for (int j = 0; j < layers; j++) {
+            //    for (int k = 0; k < neuronLayers[j]; k++) {
+            //        printf("D[%d][%d] = %.6f | W[%d][%d][0] = %.6f\n", j, k, D[j][k], j, k, W[j][k][0]);
+            //    }
+            //}
         }
 
         //Stop early if error improvement is less than 0.001
@@ -179,26 +233,27 @@ int main() {
     //Loop through testing data
     for (int i = TRAINING_SIZE; i < DATA_SIZE; i++) {
 
-        //Calculate Result for each neuron in first layer
-        for (int j = 0; j < LAYER_1_SIZE; j++) {
+        // For each layer
+        for (int j = 0; j < layers; j++) {
 
-            // Calculate Predicted Price
-            Z1[j] = 0;
-            for (int k = 0; k < INPUT_SIZE; k++)
-                Z1[j] += x[i][k] * W1[j][k];
-            Z1[j] += B1[j];
+            // For each neuron
+            for (int k = 0; k < neuronLayers[j]; k++) {
 
-            // Activation Function: ReLU (Rectified Linear Unit)
-            A1[j] = Z1[j];
-            if (A1[j] < 0) A1[j] = 0;
+                Z[j][k] = B[j][k];
+
+                // If first layer, use inputs
+                if (j == 0) for (int z = 0; z < INPUT_SIZE; z++) Z[j][k] += x[i][z] * W[j][k][z];
+
+                // Else, use outputs from previous layer
+                else for (int z = 0; z < neuronLayers[j - 1]; z++) Z[j][k] += A[j - 1][z] * W[j][k][z];
+
+                // Activation Function: ReLU (Rectified Linear Unit)
+                A[j][k] = (Z[j][k] > 0) ? Z[j][k] : 0;
+            }
         }
 
-        // Calculate Result for Output Neuron
-        Z2 = B2;
-        for (int j = 0; j < LAYER_1_SIZE; j++) Z2 += A1[j] * W2[j];
-
         // Calculate Abs Average Error
-        eTestingAvg += fabs((y[i] - Z2) / y[i]);
+        eTestingAvg += fabs((y[i] - Z[layers - 1][0]) / y[i]);
     }
 
     // Calculate Average Error for Epoch
