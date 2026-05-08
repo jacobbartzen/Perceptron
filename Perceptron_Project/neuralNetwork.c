@@ -4,20 +4,27 @@
 #include <math.h>
 #include <time.h>
 
-//USER ADJUSTED VARIABLES
+// -------- USER ADJUSTED VARIABLES ---------
+
+//Data
 #define DATA_SIZE 20          // Amount of Data Points
 #define INPUT_SIZE 3          // Number of Different Inputs
 #define TRAINING_SIZE 15      // How much of data to use for training
 int TESTING_SIZE = DATA_SIZE - TRAINING_SIZE;
-#define EPOCHS 50000         // Amount of Times to Go Through Entire Dataset
+
+//Training
+#define EPOCHS 5000         // Amount of Times to Go Through Entire Dataset
 #define LEARNING_RATE 0.05    // How Fast Weights change based on Error
-#define PRINT_INTERVAL 10000     // How Often to Print Results (in Epochs)
+#define PRINT_INTERVAL 500     // How Often to Print Results (in Epochs)
 #define MIN_STOPPING_EPOCH 50 // Minimum Epochs before Early Stopping can Occur
-bool normalizeData = true;        //Whether to scale data between 0 and 1
+
+//Features
 bool earlyStopping = false;       //Whether to Stop Training if Error stops decreasing
-int neuronLayers[] = {50, 25, 15, 5, 1};  //Array of Neuron Counts for Each Layer
+
+//Architecture
+int neuronLayers[] = {300, 25, 15, 5, 1};  //Array of Neuron Counts for Each Layer
 #define layers 5                  //Number of Layers in Network (including output layer)
-#define maxNeurons 50             //Max Number of Neurons in a Layer (for array sizing)
+#define maxNeurons 310             //Max Number of Neurons in a Layer (for array sizing)
 
 //INPUTS: Sq footage, bedrooms, yard size
 float x[DATA_SIZE][INPUT_SIZE] = {
@@ -42,7 +49,7 @@ float x[DATA_SIZE][INPUT_SIZE] = {
     {3200, 5, 3500},
     {1900, 3, 1800}};
 
-// Ex. Result Price ($)
+//Ex. Result Price ($)
 //Linear Labels
 float y[] = {120000, 185000, 140000, 280000, 350000, 230000, 500000, 160000, 420000, 95000, 270000, 470000, 200000, 330000, 75000, 255000, 390000, 155000, 540000, 300000};
 
@@ -51,38 +58,8 @@ float y[] = {120000, 185000, 140000, 280000, 350000, 230000, 500000, 160000, 420
 
 int main() {
 
-    // Normalize Data by Dividing Each Input by Max to Scale Between 0 and 1
-    if (normalizeData) {
-
-        float maxValues[INPUT_SIZE + 1] = {0, 0, 0, 0};
-
-        // Find all maxes
-        for (int i = 0; i < DATA_SIZE; i++) {
-
-            //Find max of inputs
-            for (int j = 0; j < INPUT_SIZE; j++) {
-                if (x[i][j] > maxValues[j]) maxValues[j] = x[i][j];
-            }
-
-            //Find max of outputs
-            if (y[i] > maxValues[INPUT_SIZE]) maxValues[INPUT_SIZE] = y[i];
-        }
-
-        //Divide data by max
-        for (int i = 0; i < DATA_SIZE; i++) {
-
-            //Divide inputs by max
-            for (int j = 0; j < INPUT_SIZE; j++) {
-                x[i][j] /= maxValues[j];
-            }
-
-            //Divide output by max
-            y[i] /= maxValues[INPUT_SIZE];
-        }
-    }
-
-    //Seed Random Number Generator
-    srand(time(NULL));
+    //Max Values for Normalization
+    float maxValues[INPUT_SIZE + 1] = {0, 0, 0, 0};
 
     //Weights
     float W[layers][maxNeurons][maxNeurons];
@@ -100,6 +77,33 @@ int main() {
     float D[layers][maxNeurons];
 
     float eTotal = 0, eTrainingAvg = 0, lastEAvg = 1000, eTestingAvg = 0, hiddenError = 0, scale = 0;
+
+    //Find all maxes
+    for (int i = 0; i < DATA_SIZE; i++) {
+
+        //Find max of inputs
+        for (int j = 0; j < INPUT_SIZE; j++) {
+            if (x[i][j] > maxValues[j]) maxValues[j] = x[i][j];
+        }
+
+        //Find max of outputs
+        if (y[i] > maxValues[INPUT_SIZE]) maxValues[INPUT_SIZE] = y[i];
+    }
+
+    //Divide data by max
+    for (int i = 0; i < DATA_SIZE; i++) {
+
+        //Divide inputs by max
+        for (int j = 0; j < INPUT_SIZE; j++) {
+            x[i][j] /= maxValues[j];
+        }
+
+        //Divide output by max
+        y[i] /= maxValues[INPUT_SIZE];
+    }
+
+    //Seed Random Number Generator
+    srand(time(NULL));
 
     //Initialize Weights and Bias with small random values between -0.005 and 0.005
     for (int i = 0; i < layers; i++) {
