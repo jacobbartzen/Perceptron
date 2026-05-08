@@ -5,7 +5,6 @@
 #include <time.h>
 
 // -------- USER ADJUSTED VARIABLES ---------
-
 //Data
 #define DATA_SIZE 20          // Amount of Data Points
 #define INPUT_SIZE 3          // Number of Different Inputs
@@ -14,15 +13,19 @@ int TESTING_SIZE = DATA_SIZE - TRAINING_SIZE;
 
 //Training
 #define EPOCHS 5000         // Amount of Times to Go Through Entire Dataset
-#define LEARNING_RATE 0.05    // How Fast Weights change based on Error
-#define PRINT_INTERVAL 500     // How Often to Print Results (in Epochs)
+#define LEARNING_RATE 0.1    // How Fast Weights change based on Error
+#define PRINT_INTERVAL 5000    // How Often to Print Results (in Epochs)
 #define MIN_STOPPING_EPOCH 50 // Minimum Epochs before Early Stopping can Occur
+float dropoutChance = 0.05;   // Chance to drop each neuron during training - 0 is 0%, 1 is 100% change of dropping
+float maxNorm = 0.5;         // Maximum norm for weights if maxNormRegulation is enabled
 
 //Features
-bool earlyStopping = false;       //Whether to Stop Training if Error stops decreasing
+bool earlyStopping = false;        //Whether to Stop Training if Error stops decreasing
+bool dropout = false;              //Whether to randomly drop neurons during training to prevent overfitting
+bool maxNormRegulation = false;    //Whether to cap weights to prevent exploding gradients and overfitting
 
 //Architecture
-int neuronLayers[] = {50, 45, 40, 15, 10, 5, 1};  //Array of Neuron Counts for Each Layer
+int neuronLayers[] = {50, 10, 1};  //Array of Neuron Counts for Each Layer
 
 //INPUTS: Sq footage, bedrooms, yard size
 float x[DATA_SIZE][INPUT_SIZE] = {
@@ -57,7 +60,7 @@ float y[] = {120000, 185000, 140000, 280000, 350000, 230000, 500000, 160000, 420
 int main() {
 
     //Max Values for Normalization
-    float maxValues[INPUT_SIZE + 1] = {0, 0, 0, 0};
+    float maxValues[INPUT_SIZE + 1];
 
     int layers = sizeof(neuronLayers) / sizeof(neuronLayers[0]);
 
@@ -97,6 +100,7 @@ int main() {
     float eTotal = 0, eTrainingAvg = 0, lastEAvg = 1000, eTestingAvg = 0, hiddenError = 0, scale = 0;
 
     //Find all maxes
+    for (int i = 0; i < INPUT_SIZE + 1; i++) maxValues[i] = 0;
     for (int i = 0; i < DATA_SIZE; i++) {
 
         //Find max of inputs
@@ -154,6 +158,14 @@ int main() {
                 //For each neuron
                 for (int k = 0; k < neuronLayers[j]; k++) {
 
+                    //Dropout - Randomly drop neurons during training to prevent overfitting
+                    if (dropout && j < layers - 1) {
+                        if (((float)rand() / RAND_MAX) < dropoutChance) { // 20% chance to drop
+                            A[j][k] = 0; // Drop neuron by setting activation to 0
+                            continue; // Skip calculations for this neuron
+                        }
+                    }
+
                     Z[j][k] = B[j][k];
 
                     //If first layer, use inputs
@@ -210,6 +222,9 @@ int main() {
                     if (j == 0) {
                         for (int z = 0; z < INPUT_SIZE; z++) {
                             W[j][k][z] += LEARNING_RATE * D[j][k] * x[i][z];
+
+                            // Max Norm Regulation - Limit the maximum norm of the weights to prevent exploding gradients
+                            if (maxNormRegulation && fabs(W[j][k][z]) > maxNorm) W[j][k][z] = maxNorm;
                         }
                     }
 
@@ -217,6 +232,9 @@ int main() {
                     else {
                         for (int z = 0; z < neuronLayers[j - 1]; z++) {
                             W[j][k][z] += LEARNING_RATE * D[j][k] * A[j - 1][z];
+
+                            // Max Norm Regulation - Limit the maximum norm of the weights to prevent exploding gradients
+                            if (maxNormRegulation && fabs(W[j][k][z]) > maxNorm) W[j][k][z] = maxNorm;
                         }
                     }
                 }
@@ -281,7 +299,26 @@ int main() {
     // Calculate Average Error for Epoch
     eTestingAvg = (eTestingAvg / TESTING_SIZE) * 100;
 
-    printf("Training Final Error: %.2f | Testing Average Error: %.2f", eTrainingAvg, eTestingAvg);
+    printf("Training Final Error: %.2f | Testing Average Error: %.2f\n", eTrainingAvg, eTestingAvg);
+
+    //Free Allocated Memory
+    for (int i = 0; i < layers; i++) {
+        for (int j = 0; j < neuronLayers[i]; j++) {
+            free(W[i][j]);
+        }
+        free(W[i]);
+        free(B[i]);
+        free(Z[i]);
+        free(A[i]);
+        free(D[i]);
+    }
+    free(W);
+    free(B);
+    free(Z);
+    free(A);
+    free(D);
+
+    printf("Memory Freed: Program Complete\n");
 
     return 0;
 }
