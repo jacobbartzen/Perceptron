@@ -22,9 +22,7 @@ int TESTING_SIZE = DATA_SIZE - TRAINING_SIZE;
 bool earlyStopping = false;       //Whether to Stop Training if Error stops decreasing
 
 //Architecture
-int neuronLayers[] = {300, 25, 15, 5, 1};  //Array of Neuron Counts for Each Layer
-#define layers 5                  //Number of Layers in Network (including output layer)
-#define maxNeurons 310             //Max Number of Neurons in a Layer (for array sizing)
+int neuronLayers[] = {50, 45, 40, 15, 10, 5, 1};  //Array of Neuron Counts for Each Layer
 
 //INPUTS: Sq footage, bedrooms, yard size
 float x[DATA_SIZE][INPUT_SIZE] = {
@@ -61,21 +59,41 @@ int main() {
     //Max Values for Normalization
     float maxValues[INPUT_SIZE + 1] = {0, 0, 0, 0};
 
+    int layers = sizeof(neuronLayers) / sizeof(neuronLayers[0]);
+
+    // ---------- Loop to declare all arrays needed to heap ----------
+
     //Weights
-    float W[layers][maxNeurons][maxNeurons];
+    float ***W = malloc(sizeof(float**) * layers);
 
     //Bias
-    float B[layers][maxNeurons];
+    float **B = malloc(sizeof(float*) * layers);
 
     //Preactiviation Value
-    float Z[layers][maxNeurons];
+    float **Z = malloc(sizeof(float*) * layers);
 
     //Activation Value
-    float A[layers][maxNeurons];
+    float **A = malloc(sizeof(float*) * layers);
 
     //Delta for Backpropagation
-    float D[layers][maxNeurons];
+    float **D = malloc(sizeof(float*) * layers);
 
+    for (int i = 0; i < layers; i++) {
+
+        //Allocate Memory for Each Layer
+        W[i] = malloc(sizeof(float*) * neuronLayers[i]);
+        B[i] = malloc(sizeof(float) * neuronLayers[i]);
+        Z[i] = malloc(sizeof(float) * neuronLayers[i]);
+        A[i] = malloc(sizeof(float) * neuronLayers[i]);
+        D[i] = malloc(sizeof(float) * neuronLayers[i]);
+
+        //Create 3d array for weights
+        for (int j = 0; j < neuronLayers[i]; j++) {
+            W[i][j] = malloc(sizeof(float) * ((i == 0) ? INPUT_SIZE : neuronLayers[i - 1]));
+        }
+    }
+
+    //All varibles needed later
     float eTotal = 0, eTrainingAvg = 0, lastEAvg = 1000, eTestingAvg = 0, hiddenError = 0, scale = 0;
 
     //Find all maxes
