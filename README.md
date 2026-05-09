@@ -71,4 +71,10 @@ If the activation function was ReLU and not leaky ReLU, the blame would be 0 if 
 
 # Weight Updates
 
-Now that each neuron has its blame assigned for how much it contributed to the final error, it is possible to update the weights for each neuron.
+Now that each neuron has its blame assigned for how much it contributed to the final error, it is possible to update the weights and bias for each neuron.
+
+1. Update bias based off of learningRate and Blame
+  Bias += LEARNING_RATE * Blame
+
+2. Update weights based off of learningRate, Blame, and the previous layers output
+  Weight += LEARNING_RATE * Blame * PreviousLayerOutput
