@@ -12,20 +12,21 @@
 int TESTING_SIZE = DATA_SIZE - TRAINING_SIZE;
 
 //Training
-#define EPOCHS 5000         // Amount of Times to Go Through Entire Dataset
-#define LEARNING_RATE 0.1    // How Fast Weights change based on Error
-#define PRINT_INTERVAL 5000    // How Often to Print Results (in Epochs)
-#define MIN_STOPPING_EPOCH 50 // Minimum Epochs before Early Stopping can Occur
-float dropoutChance = 0.05;   // Chance to drop each neuron during training - 0 is 0%, 1 is 100% change of dropping
-float maxNorm = 0.5;         // Maximum norm for weights if maxNormRegulation is enabled
+#define EPOCHS 50000        //Amount of Times to Go Through Entire Dataset
+#define LEARNING_RATE 0.05     //How Fast Weights change based on Error
+#define PRINT_INTERVAL 10000  //How Often to Print Results (in Epochs)
+#define MIN_STOPPING_EPOCH 50 //Minimum Epochs before Early Stopping can Occur
+float dropoutChance = 0.05;   //Chance to drop each neuron during training - 0 is 0%, 1 is 100% change of dropping
+float maxNorm = 0.5;          //Maximum norm for weights if maxNormRegulation is enabled
 
 //Features
 bool earlyStopping = false;        //Whether to Stop Training if Error stops decreasing
 bool dropout = false;              //Whether to randomly drop neurons during training to prevent overfitting
 bool maxNormRegulation = false;    //Whether to cap weights to prevent exploding gradients and overfitting
+#define momentum 0.9               //Momentum factor (set to 0 to turn off)
 
 //Architecture
-int neuronLayers[] = {50, 10, 1};  //Array of Neuron Counts for Each Layer
+int neuronLayers[] = {30, 15, 1};  //Array of Neuron Counts for Each Layer
 
 //INPUTS: Sq footage, bedrooms, yard size
 float x[DATA_SIZE][INPUT_SIZE] = {
@@ -52,10 +53,10 @@ float x[DATA_SIZE][INPUT_SIZE] = {
 
 //Ex. Result Price ($)
 //Linear Labels
-float y[] = {120000, 185000, 140000, 280000, 350000, 230000, 500000, 160000, 420000, 95000, 270000, 470000, 200000, 330000, 75000, 255000, 390000, 155000, 540000, 300000};
+//float y[] = {120000, 185000, 140000, 280000, 350000, 230000, 500000, 160000, 420000, 95000, 270000, 470000, 200000, 330000, 75000, 255000, 390000, 155000, 540000, 300000};
 
 //Non-Linear Labels
-//float y[] = {95000, 210000, 125000, 480000, 890000, 370000, 2100000, 175000, 1400000, 72000, 460000, 1850000, 240000, 750000, 52000, 420000, 1150000, 162000, 2800000, 580000};
+float y[] = {95000, 210000, 125000, 480000, 890000, 370000, 2100000, 175000, 1400000, 72000, 460000, 1850000, 240000, 750000, 52000, 420000, 1150000, 162000, 2800000, 580000};
 
 int main() {
 
@@ -65,9 +66,14 @@ int main() {
     int layers = sizeof(neuronLayers) / sizeof(neuronLayers[0]);
 
     // ---------- Loop to declare all arrays needed to heap ----------
-
     //Weights
     float ***W = malloc(sizeof(float**) * layers);
+
+    //Velocity for each Weight
+    float ***Velocity = malloc(sizeof(float**) * layers);
+
+    //Velocity for each Bias
+    float **VelocityB = malloc(sizeof(float*) * layers);
 
     //Bias
     float **B = malloc(sizeof(float*) * layers);
@@ -85,19 +91,26 @@ int main() {
 
         //Allocate Memory for Each Layer
         W[i] = malloc(sizeof(float*) * neuronLayers[i]);
+        Velocity[i] = malloc(sizeof(float*) * neuronLayers[i]);
+        VelocityB[i] = malloc(sizeof(float) * neuronLayers[i]);
         B[i] = malloc(sizeof(float) * neuronLayers[i]);
         Z[i] = malloc(sizeof(float) * neuronLayers[i]);
         A[i] = malloc(sizeof(float) * neuronLayers[i]);
         D[i] = malloc(sizeof(float) * neuronLayers[i]);
 
-        //Create 3d array for weights
+        //Create 3d array for Weights and Velocity
         for (int j = 0; j < neuronLayers[i]; j++) {
             W[i][j] = malloc(sizeof(float) * ((i == 0) ? INPUT_SIZE : neuronLayers[i - 1]));
+            Velocity[i][j] = malloc(sizeof(float) * ((i == 0) ? INPUT_SIZE : neuronLayers[i - 1]));
+
+            //Set all Velocity to 0
+            VelocityB[i][j] = 0;
+            for (int k = 0; k < ((i == 0) ? INPUT_SIZE : neuronLayers[i - 1]); k++) Velocity[i][j][k] = 0;
         }
     }
 
     //All varibles needed later
-    float eTotal = 0, eTrainingAvg = 0, lastEAvg = 1000, eTestingAvg = 0, hiddenError = 0, scale = 0;
+    float eTotal = 0, eTrainingAvg = 0, lastEAvg = 1000, eTestingAvg = 0, hiddenError = 0, scale = 0, currentGradient = 0, loops = 0;
 
     //Find all maxes
     for (int i = 0; i < INPUT_SIZE + 1; i++) maxValues[i] = 0;
@@ -215,27 +228,26 @@ int main() {
                 //For each neuron
                 for (int k = 0; k < neuronLayers[j]; k++) {
 
+                    //Calcualte Bias Velocity
+                    VelocityB[j][k] = momentum * VelocityB[j][k] + LEARNING_RATE * D[j][k];
+
                     //Update Bias
-                    B[j][k] += LEARNING_RATE * D[j][k];
+                    B[j][k] += VelocityB[j][k];
 
-                    //If first layer use inputs
-                    if (j == 0) {
-                        for (int z = 0; z < INPUT_SIZE; z++) {
-                            W[j][k][z] += LEARNING_RATE * D[j][k] * x[i][z];
+                    loops = (j == 0) ? INPUT_SIZE : neuronLayers[j - 1];
 
-                            // Max Norm Regulation - Limit the maximum norm of the weights to prevent exploding gradients
-                            if (maxNormRegulation && fabs(W[j][k][z]) > maxNorm) W[j][k][z] = maxNorm;
-                        }
-                    }
+                    for (int z = 0; z < loops; z++) {
+                        
+                        currentGradient = (j == 0) ? D[j][k] * x[i][z] : D[j][k] * A[j - 1][z];
 
-                    //Else use other neurons
-                    else {
-                        for (int z = 0; z < neuronLayers[j - 1]; z++) {
-                            W[j][k][z] += LEARNING_RATE * D[j][k] * A[j - 1][z];
+                        //Calculate Velocity
+                        Velocity[j][k][z] = momentum * Velocity[j][k][z] + LEARNING_RATE * currentGradient;
 
-                            // Max Norm Regulation - Limit the maximum norm of the weights to prevent exploding gradients
-                            if (maxNormRegulation && fabs(W[j][k][z]) > maxNorm) W[j][k][z] = maxNorm;
-                        }
+                        //Update Weight with Momentum
+                        W[j][k][z] += Velocity[j][k][z];
+
+                        //Max Norm Regulation - Limit the maximum norm of the weights to prevent exploding gradients
+                        if (maxNormRegulation && fabs(W[j][k][z]) > maxNorm) W[j][k][z] = maxNorm;
                     }
                 }
             }
@@ -252,7 +264,7 @@ int main() {
         if (epoch % PRINT_INTERVAL == 0) {
 
             //Print Epoch, Average Error, and Runtime
-            printf("Epoch: %i | Average Error: %.2f | Runtime: %.1f | Result: %.3f\n", epoch, eTrainingAvg, runtime * 1000, Z[layers - 1][0]);
+            printf("Epoch: %i | Average Error: %.4f | Runtime: %.1f | Result: %.3f\n", epoch, eTrainingAvg, runtime * 1000, Z[layers - 1][0]);
 
             //for (int j = 0; j < layers; j++) {
             //    for (int k = 0; k < neuronLayers[j]; k++) {
