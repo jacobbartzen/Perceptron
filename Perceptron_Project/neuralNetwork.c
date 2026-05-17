@@ -6,34 +6,34 @@
 
 // -------- USER ADJUSTED VARIABLES ---------
 //Data
-#define DATA_SIZE 20          // Amount of Data Points
-#define INPUT_SIZE 3          // Number of Different Inputs
-#define TRAINING_SIZE 15      // How much of data to use for training
-int TESTING_SIZE = DATA_SIZE - TRAINING_SIZE;
+#define DATA_SIZE 20                //Amount of Data Points
+#define INPUT_SIZE 3                //Number of Different Inputs / Parameters
+#define TRAINING_SIZE 15            //How many data points to use for training
+#define TESTING_SIZE (DATA_SIZE - TRAINING_SIZE)
 
 //Training
-#define EPOCHS 5000        //Amount of Times to Go Through Entire Dataset
-#define LEARNING_RATE 0.0003     //How Fast Weights change based on Error
-#define PRINT_INTERVAL 1000  //How Often to Print Results (in Epochs)
-#define MIN_STOPPING_EPOCH 50 //Minimum Epochs before Early Stopping can Occur
-#define dropoutChance  0.05   //Chance to drop each neuron during training - 0 is 0%, 1 is 100% change of dropping
-#define maxNorm 0.6          //Maximum norm for weights if maxNormRegulation is enabled
-#define momentumDecay 0.90    // Momentum factor
-#define scalingDecay 0.999     // Scaling factor for learning rate decay
+#define EPOCHS 1000                  //Amount of Times to Go Through Entire Dataset
+#define LEARNING_RATE 0.7            //How Fast Weights change based on Error
+#define PRINT_INTERVAL 200           //How Often to Print Results (in Epochs)
+#define MIN_STOPPING_EPOCH 50        //Minimum Epochs before Early Stopping can Occur
+#define dropoutChance  0.05          //Chance to drop each neuron during training - 0 is 0%, 1 is 100% change of dropping
+#define maxNorm 0.7                  //Maximum norm for weights if maxNormRegulation is enabled
+#define momentumDecay 0.90           //Momentum factor
+#define scalingDecay 0.9990          //Scaling factor for learning rate decay
 
 //Features
-bool earlyStopping = false;        //Whether to Stop Training if Error stops decreasing
-bool dropout = false;              //Whether to randomly drop neurons during training to prevent overfitting
-bool maxNormRegulation = false;    //Whether to cap weights to prevent exploding gradients and overfitting
+bool earlyStopping = false;          //Whether to Stop Training if Error stops decreasing
+bool dropout = false;                //Whether to randomly drop neurons during training to prevent overfitting
+bool maxNormRegulation = false;      //Whether to cap weights to prevent exploding gradients and overfitting
 
-//Optimizers (ONLY SET 1 TO TRUE)     //Optimal Learning Rate for Optimizer
-bool adamOptimizer = true;            //Learning Rate: 0.0003
-bool RMSPropOptimizer = false;        //Learning Rate: 0.00005
-bool momentumOptimizer = false;       //Learning Rate: 0.5
-//No Opimizer                         //Learning Rate: 0.2
+//Optimizers (ONLY SET 1 TO TRUE)    //Optimal Learning Rate for Optimizer
+bool adamOptimizer = false;          //Learning Rate: 0.0003
+bool RMSPropOptimizer = false;       //Learning Rate: 0.00005
+bool momentumOptimizer = true;       //Learning Rate: 0.5
+//No Opimizer (Set all to false)     //Learning Rate: 0.2
 
 //Architecture
-int neuronLayers[] = {50, 20, 1};  //Array of Neuron Counts for Each Layer
+int neuronLayers[] = {50, 20, 1};    //Array of Neuron Counts for Each Layer
 
 //INPUTS: Sq footage, bedrooms, yard size
 float x[DATA_SIZE][INPUT_SIZE] = {
@@ -70,6 +70,7 @@ int main() {
     //Max Values for Normalization
     float maxValues[INPUT_SIZE + 1];
 
+    //Calculate layers
     int layers = sizeof(neuronLayers) / sizeof(neuronLayers[0]);
 
     // ---------- Loop to declare all arrays needed to heap ----------
@@ -132,8 +133,11 @@ int main() {
     //All varibles needed later
     float eTotal = 0, eTrainingAvg = 0, lastEAvg = 1000, eTestingAvg = 0, hiddenError = 0, scale = 0, currentGradient = 0, loops = 0, correctedA, correctedB = 0;
 
-    //Find all maxes
+    // --- Find all maxes ---
+    //Set max values to 0
     for (int i = 0; i < INPUT_SIZE + 1; i++) maxValues[i] = 0;
+
+    //Loop through data to find max of each input and output
     for (int i = 0; i < DATA_SIZE; i++) {
 
         //Find max of inputs
@@ -145,13 +149,11 @@ int main() {
         if (y[i] > maxValues[INPUT_SIZE]) maxValues[INPUT_SIZE] = y[i];
     }
 
-    //Divide data by max
+    //Loop through all data and divide by max
     for (int i = 0; i < DATA_SIZE; i++) {
 
         //Divide inputs by max
-        for (int j = 0; j < INPUT_SIZE; j++) {
-            x[i][j] /= maxValues[j];
-        }
+        for (int j = 0; j < INPUT_SIZE; j++) x[i][j] /= maxValues[j];
 
         //Divide output by max
         y[i] /= maxValues[INPUT_SIZE];
@@ -160,18 +162,29 @@ int main() {
     //Seed Random Number Generator
     srand(time(NULL));
 
-    //Initialize Weights and Bias with small random values between -0.005 and 0.005
+    //Initialize Weights and Bias with scaled random values (He Initialization)
     for (int i = 0; i < layers; i++) {
-        int prevSize = (i == 0) ? INPUT_SIZE : neuronLayers[i - 1];
-        scale = sqrt(2.0f / prevSize);
+
+        //Inputs size loops for first layer, previous layer size for other layesr
+        loops = (i == 0) ? INPUT_SIZE : neuronLayers[i - 1];
+
+        //Scale values based on size of previous layer - sqrt(2 / previous layer size)
+        scale = sqrt(2.0f / loops);
+
+        //For each neuron in the layer
         for (int j = 0; j < neuronLayers[i]; j++) {
-            B[i][j] = 0; // bias initialized to 0 is standard with He init
-            for (int k = 0; k < prevSize; k++) {
+
+            //Set Bias to 0
+            B[i][j] = 0;
+
+            //Set each weight to scaled random value
+            for (int k = 0; k < loops; k++) {
                 W[i][j][k] = (((float)rand() / RAND_MAX) * 2 - 1) * scale;
             }
         }
     }
 
+    //All variable initialization is done, print message and start training
     printf("Weights and Biases Allocated and Randomly Initialized - Starting Training\n");
 
     //START TIMING
@@ -180,13 +193,13 @@ int main() {
     //Network Training Loop
     for (int epoch = 1; epoch <= EPOCHS; epoch++) {
 
-        //Reset Average Error for Epoch
+        //Reset Average Error for each Epoch
         eTrainingAvg = 0;
 
         //Loop through each data point in training set
         for (int i = 0; i < TRAINING_SIZE; i++) {
 
-            //Forward Pass
+            // --- Forward Pass ---
             //For each layer
             for (int j = 0; j < layers; j++) {
 
@@ -195,32 +208,45 @@ int main() {
 
                     //Dropout - Randomly drop neurons during training to prevent overfitting
                     if (dropout && j < layers - 1) {
-                        if (((float)rand() / RAND_MAX) < dropoutChance) { // 20% chance to drop
-                            A[j][k] = 0; // Drop neuron by setting activation to 0
-                            continue; // Skip calculations for this neuron
+
+                        //Random chance to drop neuron
+                        if (((float)rand() / RAND_MAX) < dropoutChance) {
+
+                            //Set value to 0
+                            A[j][k] = 0;
+
+                            //Exit loop
+                            continue;
                         }
                     }
 
+                    //Set neuron value to bias
                     Z[j][k] = B[j][k];
 
-                    //If first layer, use inputs
+                    //If first layer, add dot product of all inputs and weights
                     if (j == 0) for (int z = 0; z < INPUT_SIZE; z++) Z[j][k] += x[i][z] * W[j][k][z];
 
-                    //Else, use outputs from previous layer
+                    //If not first layer, add dot product of all activations from previous layer and weights
                     else for (int z = 0; z < neuronLayers[j - 1]; z++) Z[j][k] += A[j - 1][z] * W[j][k][z];
 
-                    //Activation Function: Leaky ReLU (Rectified Linear Unit)
+                    //Activation Function: Leaky ReLU
                     A[j][k] = (Z[j][k] > 0) ? Z[j][k] : 0.01f * Z[j][k];
                 }
             }
 
-            //Calculate Total Error
+            //Calculate Total Error: Label - Preactivation Output Neuron Value
             eTotal = y[i] - Z[layers - 1][0];
 
-            //Calculate Abs Average Error
-            eTrainingAvg += fabs(eTotal / y[i]);
+            //Absolute Value of Error
+            if (eTotal < 0) eTotal *= -1;
 
-            //Backward Pass (Backpropagation)
+            //Calculate Average Error for Prints
+            eTrainingAvg += eTotal / y[i];
+
+            // --- Backpropagation ---
+
+            //Step 1: Calculate Blame for every neuron, starting with output layer
+
             //For output layer, delta is total error
             D[layers - 1][0] = eTotal;
 
@@ -243,33 +269,41 @@ int main() {
                 }
             }
 
-            //Update Weights and Biases using Deltas
+            //Step 2: Update Weights and Biases using Deltas
             //For each layer
             for (int j = 0; j < layers; j++) {
 
                 //For each neuron
                 for (int k = 0; k < neuronLayers[j]; k++) {
 
+                    //If using an optimizer
                     if (momentumOptimizer || RMSPropOptimizer || adamOptimizer) {
 
-                        //Calculate Bias Velocity / 1st Moment
-                        VelocityB[j][k] = momentumDecay * VelocityB[j][k] + (1 - momentumDecay) * D[j][k];
+                        //Velocity is needed for momentum and adam Optimizer
+                        if (momentumOptimizer || adamOptimizer) {
+                            //Calculate Bias Velocity / 1st Moment
+                            VelocityB[j][k] = momentumDecay * VelocityB[j][k] + (1 - momentumDecay) * D[j][k];
 
-                        if (momentumOptimizer) {
-                            //Update Bias
-                            B[j][k] += VelocityB[j][k] * LEARNING_RATE;
+                            //If just momentum, update bias
+                            if (momentumOptimizer) {
+                                //Update Bias
+                                B[j][k] += VelocityB[j][k] * LEARNING_RATE;
+                            }
                         }
 
-                        else if (RMSPropOptimizer || adamOptimizer) {
+                        //Scaling is needed for RMSProp and Adam Optimizer
+                        if (RMSPropOptimizer || adamOptimizer) {
 
                             //Calculate Bias Scaling / 2nd Moment
                             ScalingB[j][k] = scalingDecay * ScalingB[j][k] + (1 - scalingDecay) * D[j][k] * D[j][k];
 
+                            //If just RMSProp, update bias
                             if (RMSPropOptimizer) {
                                 //Update Bias with RMSProp
                                 B[j][k] += LEARNING_RATE / (sqrt(ScalingB[j][k]) + 1e-8) * D[j][k];
                             }
 
+                            //If Adam, apply bias correction and update
                             else if (adamOptimizer) {
                                 //Bias Correction for Adam
                                 correctedA = VelocityB[j][k] / (1 - pow(momentumDecay, epoch));
@@ -280,42 +314,63 @@ int main() {
                             }
                         }
                     }
+
+                    //If no optimizer, update bias with gradient descent
                     else B[j][k] += LEARNING_RATE * D[j][k];
 
+                    //Loops needed to update all weights
                     loops = (j == 0) ? INPUT_SIZE : neuronLayers[j - 1];
 
+                    //For each weight
                     for (int z = 0; z < loops; z++) {
                         
+                        //Calculate current gradient
                         currentGradient = (j == 0) ? D[j][k] * x[i][z] : D[j][k] * A[j - 1][z];
                         
+                        //If using an optimizer
                         if (momentumOptimizer || RMSPropOptimizer || adamOptimizer) {
-                            //Calculate Momentum Velocity / 1st Moment
-                            Velocity[j][k][z] = momentumDecay * Velocity[j][k][z] + (1 - momentumDecay) * currentGradient;
+
+                            //Velocity is needed for momentum and adam Optimizer
+                            if (momentumOptimizer || adamOptimizer) {
+
+                                //Calculate Momentum Velocity / 1st Moment
+                                Velocity[j][k][z] = momentumDecay * Velocity[j][k][z] + (1 - momentumDecay) * currentGradient;
                             
-                            if (momentumOptimizer) {
-                                //Update Weight with Momentum
-                                W[j][k][z] += Velocity[j][k][z] * LEARNING_RATE;
+                                //If just momentum, update weight
+                                if (momentumOptimizer) {
+
+                                    //Update Weight with Momentum
+                                    W[j][k][z] += Velocity[j][k][z] * LEARNING_RATE;
+                                }
                             }
 
-                            else if (RMSPropOptimizer || adamOptimizer) {
+                            //Scaling is needed for RMSProp and Adam Optimizer
+                            if (RMSPropOptimizer || adamOptimizer) {
+
                                 //Calculate Scaling / 2nd Moment
                                 Scaling[j][k][z] = scalingDecay * Scaling[j][k][z] + (1 - scalingDecay) * currentGradient * currentGradient;
 
+                                //If just RMSProp, update weight
                                 if (RMSPropOptimizer) {
+
                                     // Update Weight with RMSProp
                                     W[j][k][z] += LEARNING_RATE / (sqrt(Scaling[j][k][z]) + 1e-8) * currentGradient;
                                 }
 
+                                //If Adam, apply bias correction and update
                                 else if (adamOptimizer) {
+
                                     //Bias Correction for Adam
-                                    correctedA = Velocity[j][k][z] / (1 - pow(momentumDecay, epoch));
-                                    correctedB = Scaling[j][k][z] / (1 - pow(scalingDecay, epoch));
+                                    correctedA = Velocity[j][k][z] / (1 - pow(momentumDecay, TRAINING_SIZE * epoch));
+                                    correctedB = Scaling[j][k][z] / (1 - pow(scalingDecay, TRAINING_SIZE * epoch));
 
                                     //Update Weight with Adam
                                     W[j][k][z] += LEARNING_RATE / (sqrt(correctedB) + 1e-8) * correctedA;
                                 }
                             }
                         }
+
+                        //If no optimizer, update weight with gradient descent
                         else W[j][k][z] += LEARNING_RATE * currentGradient;
 
                         //Max Norm Regulation - Limit the maximum norm of the weights to prevent exploding gradients
@@ -326,16 +381,16 @@ int main() {
         }
 
         //Calculate Average Error for Epoch
-        eTrainingAvg = (eTrainingAvg / TRAINING_SIZE) * 100;
+        eTrainingAvg = eTrainingAvg / TRAINING_SIZE * 100;
 
-        //End timing and calculate total runtime for epoch
+        //Mark continuous timing and calculate total runtime
         clock_t end = clock();
         double runtime = (double)(end - start) / CLOCKS_PER_SEC;
 
         //Print Results at set intervals
         if (epoch % PRINT_INTERVAL == 0) {
 
-            //Print Epoch, Average Error, and Runtime
+            //Print Epoch, Average Error, Runtime, and Result
             printf("Epoch: %i | Average Error: %.4f | Runtime: %.1f | Result: %.3f\n", epoch, eTrainingAvg, runtime * 1000, Z[layers - 1][0]);
 
             //for (int j = 0; j < layers; j++) {
@@ -345,12 +400,13 @@ int main() {
             //}
         }
 
-        //Stop early if error improvement is less than 0.001
+        //Stop early if error improvement is less than 0.001 and using early stopping
         if (earlyStopping && lastEAvg - eTrainingAvg < 0.001 && epoch > MIN_STOPPING_EPOCH) {
             printf("Stopping Early - Error Improvement: %.4f\n", lastEAvg - eTrainingAvg);
             break;
         }
 
+        //Update lastEAvg for Early Stopping Check
         lastEAvg = eTrainingAvg;
     }
 
@@ -363,16 +419,17 @@ int main() {
             // For each neuron
             for (int k = 0; k < neuronLayers[j]; k++) {
 
+                //Set neuron value to bias
                 Z[j][k] = B[j][k];
 
-                // If first layer, use inputs
+                //If first layer, use inputs
                 if (j == 0) for (int z = 0; z < INPUT_SIZE; z++) Z[j][k] += x[i][z] * W[j][k][z];
 
-                // Else, use outputs from previous layer
+                //Else, use outputs from previous layer
                 else for (int z = 0; z < neuronLayers[j - 1]; z++) Z[j][k] += A[j - 1][z] * W[j][k][z];
 
-                // Activation Function: ReLU (Rectified Linear Unit)
-                A[j][k] = (Z[j][k] > 0) ? Z[j][k] : 0;
+                //Activation Function: Leaky ReLU
+                A[j][k] = (Z[j][k] > 0) ? Z[j][k] : 0.01f * Z[j][k];
             }
         }
 
