@@ -16,8 +16,8 @@ int TESTING_SIZE = DATA_SIZE - TRAINING_SIZE;
 #define LEARNING_RATE 0.0003     //How Fast Weights change based on Error
 #define PRINT_INTERVAL 1000  //How Often to Print Results (in Epochs)
 #define MIN_STOPPING_EPOCH 50 //Minimum Epochs before Early Stopping can Occur
-float dropoutChance = 0.05;   //Chance to drop each neuron during training - 0 is 0%, 1 is 100% change of dropping
-float maxNorm = 0.6;          //Maximum norm for weights if maxNormRegulation is enabled
+#define dropoutChance  0.05   //Chance to drop each neuron during training - 0 is 0%, 1 is 100% change of dropping
+#define maxNorm 0.6          //Maximum norm for weights if maxNormRegulation is enabled
 #define momentumDecay 0.90    // Momentum factor
 #define scalingDecay 0.999     // Scaling factor for learning rate decay
 
